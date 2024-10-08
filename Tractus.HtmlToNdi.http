@@ -1,0 +1,6 @@
+@Tractus.HtmlToNdi_HostAddress = http://localhost:5263
+
+GET {{Tractus.HtmlToNdi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
