@@ -2,6 +2,8 @@
 
 A simple wrapper around [CEFSharp](https://github.com/cefsharp/CefSharp) and [NDI Wrapper for .NET](https://github.com/eliaspuurunen/NdiLibDotNetCoreBase). Sends HTML pages to NDI, including audio if playback on the page is supported.
 
+[Grab the latest ZIP file](https://github.com/tractusevents/Tractus.HtmlToNdi/releases) from the releases page.
+
 ## Usage
 
 Launch as-is for a 1920x1080 browser instance. The app will ask you for a source name if one is not provided on the command line.
