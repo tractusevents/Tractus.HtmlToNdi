@@ -21,6 +21,8 @@ public class Program
 
     public static void Main(string[] args)
     {
+        var launchCachePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "cache", Guid.NewGuid().ToString());
+
         var exeDirectory = AppDomain.CurrentDomain.BaseDirectory;
         Directory.SetCurrentDirectory(exeDirectory);
         AppManagement.Initialize(args);
@@ -39,7 +41,7 @@ public class Program
             }
             catch
             {
-                Log.Error("Invalid NDI source name. Exiting.");    
+                Log.Error("Invalid NDI source name. Exiting.");
                 return;
             }
         }
@@ -64,6 +66,15 @@ public class Program
             {
                 Log.Error("Could not parse the --port parameter. Exiting.");
                 return;
+            }
+        }
+        else
+        {
+            var portNumber = "";
+            while (string.IsNullOrWhiteSpace(portNumber) || !int.TryParse(portNumber, out port))
+            {
+                Console.Write("HTTP API port # >");
+                portNumber = Console.ReadLine()?.Trim();
             }
         }
 
@@ -113,6 +124,12 @@ public class Program
         AsyncContext.Run(async delegate
         {
             var settings = new CefSettings();
+            if (!Directory.Exists(launchCachePath))
+            {
+                Directory.CreateDirectory(launchCachePath);
+            }
+
+            settings.RootCachePath = launchCachePath;
             //settings.CefCommandLineArgs.Add("--disable-gpu-sandbox");
             //settings.CefCommandLineArgs.Add("--no-sandbox");
             //settings.CefCommandLineArgs.Add("--in-process-gpu");
@@ -123,8 +140,8 @@ public class Program
             settings.EnableAudio();
             Cef.Initialize(settings);
             browserWrapper = new CefWrapper(
-                width, 
-                height, 
+                width,
+                height,
                 startUrl);
 
             await browserWrapper.InitializeWrapperAsync();
@@ -166,8 +183,36 @@ public class Program
         })
         .WithOpenApi();
 
+        app.MapGet("/scroll/{increment}", (int increment) =>
+        {
+            browserWrapper.ScrollBy(increment);
+        }).WithOpenApi();
+
+        app.MapGet("/click/{x}/{y}", (int x, int y) =>
+        {
+            browserWrapper.Click(x, y);
+        }).WithOpenApi();
+
+        app.MapPost("/keystroke", (SendKeystrokeModel model) =>
+        {
+            browserWrapper.SendKeystrokes(model);
+        }).WithOpenApi();
+
+
         app.Run();
 
         browserWrapper.Dispose();
+
+        if (Directory.Exists(launchCachePath))
+        {
+            try
+            {
+                Directory.Delete(launchCachePath, true);
+            }
+            catch
+            {
+
+            }
+        }
     }
 }

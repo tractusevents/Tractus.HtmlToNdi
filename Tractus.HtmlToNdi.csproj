@@ -7,12 +7,19 @@
     <ImplicitUsings>enable</ImplicitUsings>
 	  <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 	  <ApplicationManifest>app.manifest</ApplicationManifest>
-	  <Version>2024.10.8.1</Version>
+	  <Version>2024.11.21.1</Version>
 	  <ApplicationIcon>HtmlToNdi.ico</ApplicationIcon>
 	  <PlatformTarget>x64</PlatformTarget>
 	  <Platforms>AnyCPU;x64</Platforms>
+	  <Company>Tractus Events</Company>
 
   </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="publish_htmlndi\**" />
+    <EmbeddedResource Remove="publish_htmlndi\**" />
+    <None Remove="publish_htmlndi\**" />
+  </ItemGroup>
 
   <ItemGroup>
     <Content Include="HtmlToNdi.ico">

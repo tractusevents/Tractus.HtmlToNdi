@@ -135,4 +135,44 @@ public class CefWrapper : IDisposable
 
         this.browser.Load(url);
     }
+
+    public void ScrollBy(int increment)
+    {
+        this.browser.SendMouseWheelEvent(0, 0, 0, increment, CefEventFlags.None); 
+    }
+
+    public void Click(int x, int y)
+    {
+        var host = this.browser?.GetBrowser()?.GetHost();
+
+        if(host is null)
+        {
+            return;
+        }
+
+        host.SendMouseClickEvent(x, y,
+            MouseButtonType.Left, false, 1, CefEventFlags.None);
+        Thread.Sleep(100);
+        host.SendMouseClickEvent(x, y,
+            MouseButtonType.Left, true, 1, CefEventFlags.None);
+    }
+
+    public void SendKeystrokes(Models.SendKeystrokeModel model)
+    {
+        var host = this.browser?.GetBrowser()?.GetHost();
+
+        if (host is null)
+        {
+            return;
+        }
+
+        foreach(var c in model.ToSend)
+        {
+            host.SendKeyEvent(new KeyEvent()
+            {
+                Type = KeyEventType.KeyDown,
+                NativeKeyCode = Convert.ToInt32(c)
+            });
+        }
+    }
 }
