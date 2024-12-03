@@ -175,4 +175,8 @@ public class CefWrapper : IDisposable
             });
         }
     }
+    public void RefreshPage()
+    {
+        this.browser.Reload();
+    }
 }

@@ -161,13 +161,8 @@ public class Program
         builder.Services.AddSwaggerGen();
 
         var app = builder.Build();
-
-        // Configure the HTTP request pipeline.
-        if (app.Environment.IsDevelopment())
-        {
-            app.UseSwagger();
-            app.UseSwaggerUI();
-        }
+        app.UseSwagger();
+        app.UseSwaggerUI();
 
         var settings_T = new NDIlib.send_create_t
         {
@@ -198,6 +193,18 @@ public class Program
             browserWrapper.SendKeystrokes(model);
         }).WithOpenApi();
 
+        app.MapGet("/type/{toType}", (string toType) =>
+        {
+            browserWrapper.SendKeystrokes(new SendKeystrokeModel
+            {
+                ToSend = toType
+            });
+        }).WithOpenApi();
+
+        app.MapGet("/refresh", () =>
+        {
+            browserWrapper.RefreshPage();
+        }).WithOpenApi();
 
         app.Run();
 

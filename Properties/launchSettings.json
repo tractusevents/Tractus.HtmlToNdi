@@ -2,7 +2,7 @@
   "profiles": {
     "http": {
       "commandName": "Project",
-      //"commandLineArgs": "--ndiname=\"HTML\"",
+      "commandLineArgs": "--width=1920 --height=1080 --ndiname=\"HTML\"",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       },

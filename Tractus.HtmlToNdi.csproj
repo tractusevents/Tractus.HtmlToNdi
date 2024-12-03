@@ -7,7 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
 	  <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 	  <ApplicationManifest>app.manifest</ApplicationManifest>
-	  <Version>2024.11.21.1</Version>
+	  <Version>2024.12.3.1</Version>
 	  <ApplicationIcon>HtmlToNdi.ico</ApplicationIcon>
 	  <PlatformTarget>x64</PlatformTarget>
 	  <Platforms>AnyCPU;x64</Platforms>
