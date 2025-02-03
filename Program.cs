@@ -83,7 +83,7 @@ public class Program
         {
             try
             {
-                startUrl = args.FirstOrDefault(x => x.StartsWith("--url")).Split("=")[1];
+                startUrl = String.Join("=", args.FirstOrDefault(x => x.StartsWith("--url")).Split("=")[1..]);
             }
             catch (Exception)
             {
