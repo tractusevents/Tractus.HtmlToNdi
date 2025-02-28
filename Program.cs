@@ -10,6 +10,7 @@ using NewTek;
 using NewTek.NDI;
 using Serilog;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using Tractus.HtmlToNdi.Chromium;
 using Tractus.HtmlToNdi.Models;
 
@@ -171,6 +172,80 @@ public class Program
 
         Program.NdiSenderPtr = NDIlib.send_create(ref settings_T);
 
+        var capabilitiesXml = $$"""<ndi_capabilities ntk_kvm="true" />""";
+        capabilitiesXml += "\0";
+        var capabilitiesPtr = UTF.StringToUtf8(capabilitiesXml);
+
+        var metaframe = new NDIlib.metadata_frame_t()
+        {
+            p_data = capabilitiesPtr
+        };
+
+        NDIlib.send_add_connection_metadata(NdiSenderPtr, ref metaframe);
+        Marshal.FreeHGlobal(capabilitiesPtr);
+
+        var running = true;
+        var thread = new Thread(() =>
+        {
+            var metadata = new NDIlib.metadata_frame_t();
+            var x = 0.0f;
+            var y = 0.0f;
+            while (running)
+            {
+                var result = NDIlib.send_capture(NdiSenderPtr, ref metadata, 1000);
+
+                if (result == NDIlib.frame_type_e.frame_type_none)
+                {
+                    continue;
+                }
+                else if (result == NDIlib.frame_type_e.frame_type_metadata)
+                {
+                    var metadataConverted = UTF.Utf8ToString(metadata.p_data);
+
+                    if(metadataConverted.StartsWith("<ndi_kvm u=\""))
+                    {
+                        metadataConverted = metadataConverted.Replace("<ndi_kvm u=\"", "");
+                        metadataConverted = metadataConverted.Replace("\"/>", "");
+
+                        try
+                        {
+                            var binary = Convert.FromBase64String(metadataConverted);
+
+                            var opcode = binary[0];
+
+                            if(opcode == 0x03)
+                            {
+                                x = BitConverter.ToSingle(binary, 1);
+                                y = BitConverter.ToSingle(binary, 5);
+                            }
+                            else if(opcode == 0x04)
+                            {
+                                // Mouse Left Down
+                                var screenX = (int)(x * width);
+                                var screenY = (int)(y * height);
+
+                                browserWrapper.Click(screenX, screenY);
+                            }
+                            else if(opcode == 0x07)
+                            {
+                                // Mouse Left Up
+                            }
+                        }
+                        catch
+                        {
+
+                        }
+                    }
+
+                    Log.Logger.Warning("Got metadata: " + metadataConverted);
+                    NDIlib.send_free_metadata(NdiSenderPtr, ref metadata);
+                }
+
+            }
+        });
+        thread.Start();
+
+
         app.MapPost("/seturl", (HttpContext httpContext, GoToUrlModel url) =>
         {
             browserWrapper.SetUrl(url.Url);
@@ -208,6 +283,8 @@ public class Program
 
         app.Run();
 
+        running = false;
+        thread.Join();
         browserWrapper.Dispose();
 
         if (Directory.Exists(launchCachePath))

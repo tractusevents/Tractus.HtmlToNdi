@@ -2,7 +2,7 @@
   "profiles": {
     "http": {
       "commandName": "Project",
-      "commandLineArgs": "--width=1920 --height=1080 --ndiname=\"HTML\"",
+      "commandLineArgs": "--width=1920 --height=1080 --ndiname=\"Companion\" --url=\"http://127.0.0.1:8888/emulator/p4A2MqLuNtlRbomc-37vh\"",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
