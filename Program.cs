@@ -253,6 +253,12 @@ public class Program
         })
         .WithOpenApi();
 
+        app.MapGet("/geturl", (HttpContext httpContext) =>
+        {
+            return browserWrapper.Url;
+        })
+        .WithOpenApi();
+
         app.MapGet("/scroll/{increment}", (int increment) =>
         {
             browserWrapper.ScrollBy(increment);
