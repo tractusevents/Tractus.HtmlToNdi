@@ -246,6 +246,9 @@ public class Program
         thread.Start();
 
 
+        app.MapGet("/info", () => new { ndiName })
+        .WithOpenApi();
+
         app.MapPost("/seturl", (HttpContext httpContext, GoToUrlModel url) =>
         {
             browserWrapper.SetUrl(url.Url);
