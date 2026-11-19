@@ -46,98 +46,124 @@ public class CustomAudioHandler : IAudioHandler
         { ChannelLayout.Layout5_1_4DownMix, 6 },
     };
 
-    private AudioParameters AudioParameters { get; set; }
+    private readonly object sync = new();
+    private AudioParameters audioParameters;
     private nint audioBufferPtr;
     private int audioBufferLengthInBytes;
     private int channelCount;
 
     public void Dispose()
     {
+        lock (this.sync)
+        {
+            this.FreeBuffer();
+        }
+    }
+
+    private void FreeBuffer()
+    {
         if (this.audioBufferPtr != nint.Zero)
         {
             Marshal.FreeHGlobal(this.audioBufferPtr);
             this.audioBufferPtr = nint.Zero;
         }
+
+        this.audioBufferLengthInBytes = 0;
+    }
+
+    private void EnsureBufferCapacity(int lengthInBytes)
+    {
+        if (this.audioBufferPtr != nint.Zero && this.audioBufferLengthInBytes >= lengthInBytes)
+        {
+            return;
+        }
+
+        this.FreeBuffer();
+        this.audioBufferPtr = Marshal.AllocHGlobal(lengthInBytes);
+        this.audioBufferLengthInBytes = lengthInBytes;
     }
 
     public bool GetAudioParameters(IWebBrowser chromiumWebBrowser, IBrowser browser, ref AudioParameters parameters)
     {
-        //Console.WriteLine($"GetAudioParameters - Current thread: {Thread.CurrentThread.ManagedThreadId}");
-
-        this.AudioParameters = parameters;
-
-        if (this.audioBufferPtr != nint.Zero)
+        lock (this.sync)
         {
-            Marshal.FreeHGlobal(this.audioBufferPtr);
-            this.audioBufferPtr = nint.Zero;
-            this.audioBufferLengthInBytes = 0;
+            this.audioParameters = parameters;
+
+            // Best guess until OnAudioStreamStarted tells us the real channel count.
+            this.channelCount = ChannelLayoutToChannelCount.TryGetValue(parameters.ChannelLayout, out var count) && count > 0
+                ? count
+                : 2;
+
+            // Pre-allocate 1s worth of planar float data; grown on demand if a packet is bigger.
+            this.EnsureBufferCapacity(parameters.SampleRate * this.channelCount * sizeof(float));
         }
-
-        this.channelCount = 0;
-
-        if (!ChannelLayoutToChannelCount.ContainsKey(parameters.ChannelLayout))
-        {
-            return false;
-        }
-
-        this.channelCount = ChannelLayoutToChannelCount[parameters.ChannelLayout];
-
-        // Declare a buffer large enough to hold 1s worth of data.
-        this.audioBufferLengthInBytes =
-            parameters.SampleRate * this.channelCount * sizeof(float);
-
-        this.audioBufferPtr = Marshal.AllocHGlobal(this.audioBufferLengthInBytes);
 
         return true;
     }
 
     public void OnAudioStreamError(IWebBrowser chromiumWebBrowser, IBrowser browser, string errorMessage)
     {
+        Serilog.Log.Warning("Audio stream error: {Error}", errorMessage);
     }
 
     public unsafe void OnAudioStreamPacket(IWebBrowser chromiumWebBrowser, IBrowser browser, nint data, int noOfFrames, long pts)
     {
-        //Console.WriteLine($"OnAudioStreamPacket - Current thread: {Thread.CurrentThread.ManagedThreadId}");
-        if (this.audioBufferPtr == nint.Zero)
+        var senderPtr = Program.NdiSenderPtr;
+        if (senderPtr == nint.Zero || data == nint.Zero || noOfFrames <= 0)
         {
             return;
         }
 
-        if (Program.NdiSenderPtr == nint.Zero)
+        lock (this.sync)
         {
-            return;
+            if (this.channelCount <= 0)
+            {
+                return;
+            }
+
+            var channelLengthInBytes = sizeof(float) * noOfFrames;
+            this.EnsureBufferCapacity(channelLengthInBytes * this.channelCount);
+
+            // CEF hands us an array of per-channel float pointers; NDI wants the planes
+            // laid out back to back (FLTP), so copy each plane into one contiguous buffer.
+            var dataPtr = (float**)data;
+
+            for (var c = 0; c < this.channelCount; c++)
+            {
+                Buffer.MemoryCopy(
+                    dataPtr[c],
+                    nint.Add(this.audioBufferPtr, channelLengthInBytes * c).ToPointer(),
+                    channelLengthInBytes,
+                    channelLengthInBytes);
+            }
+
+            var audioFrame = new NDIlib.audio_frame_v2_t
+            {
+                channel_stride_in_bytes = channelLengthInBytes,
+                p_data = this.audioBufferPtr,
+                no_channels = this.channelCount,
+                no_samples = noOfFrames,
+                sample_rate = this.audioParameters.SampleRate,
+                // CEF's pts is in milliseconds while NDI timecodes are in 100ns units;
+                // let NDI synthesize it, matching what the video path does.
+                timecode = NDIlib.send_timecode_synthesize,
+            };
+
+            NDIlib.send_send_audio_v2(senderPtr, ref audioFrame);
         }
-
-        var planarDataPtr = this.audioBufferPtr.ToPointer();
-
-        float** dataPtr = (float**)data;
-
-        for (var c = 0; c < this.channelCount; c++)
-        {
-            nint destPtr = (nint)dataPtr[c];
-            Buffer.MemoryCopy(
-                dataPtr[c],
-                nint.Add(this.audioBufferPtr, sizeof(float) * c * noOfFrames).ToPointer(),
-                sizeof(float) * noOfFrames,
-                sizeof(float) * noOfFrames);
-        }
-
-        var audioFrame = new NDIlib.audio_frame_v2_t
-        {
-            channel_stride_in_bytes = sizeof(float) * noOfFrames,  // Stride for interleaved audio
-            p_data = this.audioBufferPtr,//planarData,  // Pointer to the interleaved audio data
-            no_channels = this.channelCount,  // Number of channels (e.g., 2 for stereo)
-            no_samples = noOfFrames,  // Number of frames (each frame contains a sample per channel)
-            sample_rate = this.AudioParameters.SampleRate,  // Sample rate of the audio
-            timecode = pts // Set timecode (optional)
-        };
-
-        NDIlib.send_send_audio_v2(Program.NdiSenderPtr, ref audioFrame);
     }
 
     public void OnAudioStreamStarted(IWebBrowser chromiumWebBrowser, IBrowser browser, AudioParameters parameters, int channels)
     {
-        this.AudioParameters = parameters;
+        lock (this.sync)
+        {
+            this.audioParameters = parameters;
+
+            if (channels > 0)
+            {
+                this.channelCount = channels;
+            }
+        }
     }
 
     public void OnAudioStreamStopped(IWebBrowser chromiumWebBrowser, IBrowser browser)

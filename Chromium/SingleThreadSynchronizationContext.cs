@@ -4,12 +4,12 @@ namespace Tractus.HtmlToNdi.Chromium;
 // https://github.com/cefsharp/CefSharp.MinimalExample/blob/master/CefSharp.MinimalExample.OffScreen/SingleThreadSynchronizationContext.cs
 public sealed class SingleThreadSynchronizationContext : SynchronizationContext
 {
-    private readonly BlockingCollection<KeyValuePair<SendOrPostCallback, object>> queue =
+    private readonly BlockingCollection<KeyValuePair<SendOrPostCallback, object?>> queue =
         [];
 
-    public override void Post(SendOrPostCallback d, object state)
+    public override void Post(SendOrPostCallback d, object? state)
     {
-        this.queue.Add(new KeyValuePair<SendOrPostCallback, object>(d, state));
+        this.queue.Add(new KeyValuePair<SendOrPostCallback, object?>(d, state));
     }
 
     public void RunOnCurrentThread()

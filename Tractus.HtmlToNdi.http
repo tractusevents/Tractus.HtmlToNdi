@@ -1,6 +1,35 @@
-@Tractus.HtmlToNdi_HostAddress = http://localhost:5263
+@HostAddress = http://localhost:9999
 
-GET {{Tractus.HtmlToNdi_HostAddress}}/weatherforecast/
-Accept: application/json
+POST {{HostAddress}}/seturl
+Content-Type: application/json
+
+{
+  "url": "https://testpattern.tractusevents.com/"
+}
+
+###
+
+GET {{HostAddress}}/refresh
+
+###
+
+GET {{HostAddress}}/scroll/-120
+
+###
+
+GET {{HostAddress}}/click/960/540
+
+###
+
+GET {{HostAddress}}/type/Hello%20world
+
+###
+
+POST {{HostAddress}}/keystroke
+Content-Type: application/json
+
+{
+  "toSend": "Hello world"
+}
 
 ###

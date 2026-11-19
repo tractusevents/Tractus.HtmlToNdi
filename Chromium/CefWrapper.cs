@@ -1,4 +1,3 @@
-
 using CefSharp;
 using CefSharp.OffScreen;
 using NewTek;
@@ -7,7 +6,7 @@ namespace Tractus.HtmlToNdi.Chromium;
 
 public class CefWrapper : IDisposable
 {
-    private bool disposedValue;
+    private volatile bool disposedValue;
     private ChromiumWebBrowser? browser;
 
     public int Width { get; private set; }
@@ -15,7 +14,7 @@ public class CefWrapper : IDisposable
 
     public string? Url { get; private set; }
 
-    private Thread RenderWatchdog;
+    private readonly Thread renderWatchdog;
     private DateTime lastPaint = DateTime.MinValue;
 
     public CefWrapper(int width, int height, string initialUrl)
@@ -31,16 +30,29 @@ public class CefWrapper : IDisposable
 
         this.browser.Size = new System.Drawing.Size(this.Width, this.Height);
 
-        this.RenderWatchdog = new Thread(this.RenderWatchDogThread);
+        this.renderWatchdog = new Thread(this.RenderWatchDogThread)
+        {
+            IsBackground = true,
+            Name = "CEF render watchdog"
+        };
     }
 
     private void RenderWatchDogThread()
     {
         while (!this.disposedValue)
         {
-            if(DateTime.Now.Subtract(this.lastPaint).TotalSeconds >= 1.0)
+            // CEF only paints when something changes. Force a repaint at least once a
+            // second so NDI receivers keep getting frames for static pages.
+            if (DateTime.UtcNow.Subtract(this.lastPaint).TotalSeconds >= 1.0)
             {
-                this.browser.GetBrowser().GetHost().Invalidate(PaintElementType.View);
+                try
+                {
+                    this.browser?.GetBrowserHost()?.Invalidate(PaintElementType.View);
+                }
+                catch (ObjectDisposedException)
+                {
+                    return;
+                }
             }
 
             Thread.Sleep(1000);
@@ -60,24 +72,18 @@ public class CefWrapper : IDisposable
         this.browser.ToggleAudioMute();
 
         this.browser.Paint += this.OnBrowserPaint;
-        this.RenderWatchdog.Start();
+        this.renderWatchdog.Start();
     }
 
     private void OnBrowserPaint(object? sender, OnPaintEventArgs e)
     {
-        if (Program.NdiSenderPtr == nint.Zero)
+        var senderPtr = Program.NdiSenderPtr;
+        if (senderPtr == nint.Zero)
         {
             return;
         }
 
-        var browser = sender as ChromiumWebBrowser;
-
-        if (browser is null)
-        {
-            return;
-        }
-
-        this.lastPaint = DateTime.Now;
+        this.lastPaint = DateTime.UtcNow;
 
         var videoFrame = new NDIlib.video_frame_v2_t()
         {
@@ -93,15 +99,22 @@ public class CefWrapper : IDisposable
             yres = e.Height,
         };
 
-        NDIlib.send_send_video_v2(Program.NdiSenderPtr, ref videoFrame);
+        NDIlib.send_send_video_v2(senderPtr, ref videoFrame);
     }
 
     protected virtual void Dispose(bool disposing)
     {
         if (!this.disposedValue)
         {
+            this.disposedValue = true;
+
             if (disposing)
             {
+                if (this.renderWatchdog.IsAlive)
+                {
+                    this.renderWatchdog.Join(TimeSpan.FromSeconds(2));
+                }
+
                 if (this.browser is not null)
                 {
                     this.browser.Paint -= this.OnBrowserPaint;
@@ -110,10 +123,6 @@ public class CefWrapper : IDisposable
 
                 this.browser = null;
             }
-
-            // TODO: free unmanaged resources (unmanaged objects) and override finalizer
-            // TODO: set large fields to null
-            this.disposedValue = true;
         }
     }
 
@@ -138,14 +147,14 @@ public class CefWrapper : IDisposable
 
     public void ScrollBy(int increment)
     {
-        this.browser.SendMouseWheelEvent(0, 0, 0, increment, CefEventFlags.None); 
+        this.browser?.SendMouseWheelEvent(0, 0, 0, increment, CefEventFlags.None);
     }
 
     public void Click(int x, int y)
     {
         var host = this.browser?.GetBrowser()?.GetHost();
 
-        if(host is null)
+        if (host is null)
         {
             return;
         }
@@ -161,22 +170,25 @@ public class CefWrapper : IDisposable
     {
         var host = this.browser?.GetBrowser()?.GetHost();
 
-        if (host is null)
+        if (host is null || string.IsNullOrEmpty(model.ToSend))
         {
             return;
         }
 
-        foreach(var c in model.ToSend)
+        // Text input in CEF is delivered through KEYEVENT_CHAR, with the UTF-16 code
+        // unit in WindowsKeyCode.
+        foreach (var c in model.ToSend)
         {
             host.SendKeyEvent(new KeyEvent()
             {
-                Type = KeyEventType.KeyDown,
-                NativeKeyCode = Convert.ToInt32(c)
+                Type = KeyEventType.Char,
+                WindowsKeyCode = c,
             });
         }
     }
+
     public void RefreshPage()
     {
-        this.browser.Reload();
+        this.browser?.Reload();
     }
 }
