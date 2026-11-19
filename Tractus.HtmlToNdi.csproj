@@ -1,18 +1,21 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-	  <OutputType>Exe</OutputType>
-	  <TargetFramework>net8.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <!-- CefSharp.OffScreen.NETCore only ships a Windows TFM, so the app must target net*-windows. -->
+    <TargetFramework>net10.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-	  <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-	  <ApplicationManifest>app.manifest</ApplicationManifest>
-	  <Version>2024.12.3.1</Version>
-	  <ApplicationIcon>HtmlToNdi.ico</ApplicationIcon>
-	  <PlatformTarget>x64</PlatformTarget>
-	  <Platforms>AnyCPU;x64</Platforms>
-	  <Company>Tractus Events</Company>
-
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Version>2026.11.19.1</Version>
+    <ApplicationIcon>HtmlToNdi.ico</ApplicationIcon>
+    <!-- CEF only ships x64 native binaries for this app; CefSharp needs an explicit platform. -->
+    <PlatformTarget>x64</PlatformTarget>
+    <Platforms>x64</Platforms>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>false</SelfContained>
+    <Company>Tractus Events</Company>
   </PropertyGroup>
 
   <ItemGroup>
@@ -25,24 +28,23 @@
     <Content Include="HtmlToNdi.ico">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
-  </ItemGroup>
-	<ItemGroup>
-		<FrameworkReference Include="Microsoft.AspNetCore.App" />
-	</ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="CefSharp.OffScreen.NETCore" Version="129.0.110" />
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.8" />
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.0" />
-	  <PackageReference Include="NDILibDotNetCoreBase" Version="2024.7.22.1" />
-	  <PackageReference Include="Serilog" Version="4.0.1" />
-	  <PackageReference Include="Serilog.AspNetCore" Version="8.0.2" />
-	  <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
-	  <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
-  </ItemGroup>
-  <ItemGroup>
     <None Update="HtmlToNdi.png">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CefSharp.OffScreen.NETCore" Version="156.0.300" />
+    <PackageReference Include="NDILibDotNetCoreBase" Version="2024.7.22.1" />
+    <PackageReference Include="Serilog" Version="4.4.0" />
+    <PackageReference Include="Serilog.AspNetCore" Version="11.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="11.0.1" />
   </ItemGroup>
 
 </Project>
